@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verificación de autenticidad — cIRImx</title>
+<style>
+  :root{ --guinda:#611232; --teal:#12A594; --gris:#7a7a7c; --ok:#1E9B34; --mal:#E4022B; }
+  *{box-sizing:border-box}
+  body{font-family:'Segoe UI',system-ui,Arial,sans-serif;margin:0;background:#f3fbf8;color:#161a1d}
+  header{background:var(--guinda);color:#fff;padding:16px 18px}
+  header h1{margin:0;font-size:18px}
+  header p{margin:4px 0 0;font-size:12px;opacity:.9}
+  .wrap{max-width:640px;margin:18px auto;padding:0 14px}
+  .card{background:#fff;border:1px solid #e3ece9;border-radius:14px;padding:18px;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+  .estado{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:700;margin-bottom:8px}
+  .badge{display:inline-block;padding:4px 12px;border-radius:999px;color:#fff;font-size:13px;font-weight:700}
+  table{border-collapse:collapse;width:100%;margin-top:10px;font-size:14px}
+  td{padding:7px 6px;border-bottom:1px solid #eee}
+  td.k{color:var(--gris);width:42%}
+  .buscar{display:flex;gap:8px;margin-top:12px}
+  .buscar input{flex:1;padding:10px;border:1px solid #ccc;border-radius:10px;font-size:15px}
+  .buscar button{padding:10px 16px;border:0;border-radius:10px;background:var(--teal);color:#fff;font-weight:700}
+  .foot{color:var(--gris);font-size:12px;margin-top:16px;text-align:center}
+  a{color:var(--teal)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Verificación de autenticidad · cIRImx</h1>
+  <p>DGST/SICT — Índice de Regularidad Internacional (IRI)</p>
+</header>
+<div class="wrap">
+  <div class="card" id="tarjeta">
+    <div id="cuerpo">Buscando folio…</div>
+    <div class="buscar">
+      <input id="folioInput" placeholder="Escribe un folio (ej. A1B2C3D4E5F6)">
+      <button onclick="ir()">Verificar</button>
+    </div>
+  </div>
+  <p class="foot">La app cIRImx publica aquí cada folio emitido. Si el folio aparece, el informe fue
+    generado por la app oficial. El sello criptográfico (HMAC) lo verifica el emisor.</p>
+</div>
+
+<script>
+  // Lee ?f=FOLIO de la URL
+  function qp(n){ return new URLSearchParams(location.search).get(n); }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+  function ir(){
+    var f = document.getElementById('folioInput').value.trim().toUpperCase();
+    if(f) location.search = '?f=' + encodeURIComponent(f);
+  }
+  function fila(k,v){ return '<tr><td class="k">'+esc(k)+'</td><td>'+esc(v)+'</td></tr>'; }
+
+  async function verificar(){
+    var cuerpo = document.getElementById('cuerpo');
+    var folio = (qp('f')||'').trim().toUpperCase();
+    if(!folio){ cuerpo.innerHTML = '<div style="color:#7a7a7c">Ingresa un folio para verificar.</div>'; return; }
+    try{
+      // Los folios se guardan en /folios/<FOLIO>.json en este mismo sitio.
+      var r = await fetch('folios/'+encodeURIComponent(folio)+'.json', {cache:'no-store'});
+      if(!r.ok) throw new Error('no encontrado');
+      var d = await r.json();
+      cuerpo.innerHTML =
+        '<div class="estado"><span class="badge" style="background:#1E9B34">✔ FOLIO VÁLIDO</span></div>'+
+        '<div style="color:#444;font-size:13px">Este folio fue emitido por la app oficial cIRImx.</div>'+
+        '<table>'+
+          fila('Folio', d.folio)+
+          fila('App', d.app)+
+          fila('Lectura', '#'+d.id)+
+          fila('Fecha', d.fecha)+
+          (d.carretera? fila('Carretera', d.carretera):'')+
+          (d.clave? fila('Clave', d.clave):'')+
+          fila('Longitud', d.km+' km')+
+          fila('Puntos @20 m', d.pts)+
+          fila('IRI medio celular', d.iriCel+' m/km')+
+          fila('IRI medio referencia', d.iriRef+' m/km')+
+          fila('Firma (HMAC-SHA256)', d.sig)+
+        '</table>';
+    }catch(e){
+      cuerpo.innerHTML =
+        '<div class="estado"><span class="badge" style="background:#E4022B">✘ NO ENCONTRADO</span></div>'+
+        '<div style="color:#444;font-size:13px">El folio <b>'+esc(folio)+'</b> no está en el registro. '+
+        'Puede ser un folio mal escrito o un documento no emitido por la app oficial.</div>';
+    }
+  }
+  verificar();
+  var inp=document.getElementById('folioInput'); if(inp){ inp.value = (qp('f')||''); inp.addEventListener('keydown',e=>{if(e.key==='Enter')ir();}); }
+</script>
+</body>
+</html>
